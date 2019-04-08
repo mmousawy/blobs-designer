@@ -4,11 +4,8 @@ class Blob {
     this.points = [];
 
     this.blobPath = document.createElementNS(svgNamespace, 'path');
-    const previousShape = document.querySelector('.current-shape');
-    previousShape && previousShape.classList.remove('current-shape');
-    const previousPoint = document.querySelector('.current-point');
-    previousPoint && previousPoint.classList.remove('current-point');
-    this.blobPath.classList.add('current-shape');
+
+    this.select();
   }
 
   drawBody()
@@ -64,6 +61,20 @@ class Blob {
     window.canvas.appendChild(this.blobPath);
   }
 
+  deselect()
+  {
+    blobDesigner.currentShape = null;
+    this.blobPath.classList.remove('current-shape');
+  }
+
+  select()
+  {
+    blobDesigner.currentShape && blobDesigner.currentShape.deselect();
+    this.blobPath.classList.add('current-shape');
+    blobDesigner.currentShape = this;
+    blobDesigner.currentPoint && blobDesigner.currentPoint.deselect();
+  }
+
   createPoint(position)
   {
     this.points.push({
@@ -96,14 +107,26 @@ class Point {
     this.y = props.position.y;
     this.hidden = props.hidden || false;
     this.body = document.createElementNS(svgNamespace, 'circle');
-    const previousPoint = document.querySelector('.current-point');
-    previousPoint && previousPoint.classList.remove('current-point');
-    this.body.classList.add('current-point');
+
+    this.select();
 
     if (!this.hidden) {
       window.canvas.appendChild(this.body);
       this.draw();
     }
+  }
+
+  deselect()
+  {
+    blobDesigner.currentPoint = null;
+    this.body.classList.remove('current-point');
+  }
+
+  select()
+  {
+    blobDesigner.currentPoint && blobDesigner.currentPoint.deselect();
+    this.body.classList.add('current-point');
+    blobDesigner.currentPoint = this;
   }
 
   draw()
@@ -120,7 +143,7 @@ class Point {
 
 class BlobCanvas
 {
-  constructor(mouseRadius = 1000)
+  constructor(mouseRadius = 300)
   {
     this.time = 0;
     this.blobs = [];
@@ -159,12 +182,6 @@ class BlobCanvas
 
     this.mousePosition.x = event.clientX;
     this.mousePosition.y = event.clientY;
-  }
-
-  createBlobs(blobComplexity, blobSize)
-  {
-    const blob = new Blob(blobComplexity, blobSize);
-    this.blobs.push(blob);
   }
 
   startAnimation()
@@ -251,11 +268,10 @@ class BlobDesigner
     this.paused = true;
     this.shapes = [];
 
+    this.currentShape = null;
+    this.currentPoint = null;
+
     this.blobCanvas = new BlobCanvas();
-
-    this.currentShape = new Blob();
-
-    this.shapes.push(this.currentShape);
 
     this.initMouseEvents();
     this.initKeyboardEvents();
@@ -294,6 +310,12 @@ class BlobDesigner
         button.element.addEventListener('click', (button.callback).bind(this));
       }
     });
+  }
+
+  initFirstShape()
+  {
+    this.currentShape = new Blob();
+    this.shapes.push(this.currentShape);
   }
 
   initMouseEvents()
@@ -338,7 +360,40 @@ class BlobDesigner
 
   mouseUpHandler(event)
   {
-    console.log(event);
+    let foundShape, foundPoint;
+
+    // Select point
+    if (event.target.nodeName === 'circle' && !event.target.classList.contains('current-point')) {
+
+      this.shapes.forEach(shape => {
+        if (!foundPoint) {
+          shape.points.forEach(point => {
+            if (!foundPoint) {
+              if (point.object.body === event.target) {
+                foundPoint = point.object;
+              }
+            }
+          });
+        }
+      });
+
+      foundPoint && foundPoint.select();
+    }
+
+    // Select shape
+    if (event.target.nodeName === 'path' && !event.target.classList.contains('current-shape')) {
+
+      this.shapes.forEach(shape => {
+        if (!foundShape) {
+          if (shape.blobPath === event.target) {
+            foundShape = shape;
+          }
+        }
+      });
+
+      foundPoint && foundPoint.select();
+      foundShape && foundShape.select();
+    }
   }
 
   keyDownHandler(event)
@@ -378,6 +433,8 @@ class BlobDesigner
 
       this.buttons['play'].element.classList.add('is-hidden');
       this.buttons['pause'].element.classList.remove('is-hidden');
+
+      this.blobCanvas.canvas.classList.add('is-playing');
     } else {
       this.buttons['play'].element.classList.remove('is-hidden');
       this.buttons['pause'].element.classList.add('is-hidden');
@@ -388,12 +445,17 @@ class BlobDesigner
           point.position.y = point.anchor.y;
         });
       });
+
+      this.blobCanvas.canvas.classList.remove('is-playing');
     }
   }
 
   newShapeHandler(event)
   {
     if (this.currentShape.points.length > 2) {
+      this.currentPoint && this.currentPoint.deselect();
+      this.currentShape && this.currentShape.deselect();
+
       this.currentShape = new Blob();
       this.shapes.push(this.currentShape);
     }
@@ -403,3 +465,4 @@ class BlobDesigner
 const svgNamespace = 'http://www.w3.org/2000/svg';
 const utils = new BlobUtils();
 const blobDesigner = new BlobDesigner();
+blobDesigner.initFirstShape();

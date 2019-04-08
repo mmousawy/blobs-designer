@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
-  <title>Blobs designer</title>
+  <title>Blobs Designer</title>
   <style>
     * {
       box-sizing: border-box;
@@ -29,7 +29,7 @@
       display: flex;
       width: 100%;
       padding: 1rem;
-      background: slateblue;
+      background: #45388b;
     }
 
     .button {
@@ -53,8 +53,13 @@
     }
 
     circle {
+      fill: transparent;
       stroke-width: 15;
       stroke: transparent;
+    }
+
+    svg:not(.is-playing) circle {
+      fill: #45388b;
       cursor: pointer;
     }
 
@@ -62,14 +67,15 @@
       fill: rgba(50, 155, 151, .8);
     }
 
-    .current-shape {
-      stroke: rgba(255, 14, 163, 0.8);
+    svg:not(.is-playing) .current-shape {
+      stroke: rgba(255, 14, 163, .8);
       stroke-width: 5;
     }
 
-    .current-point {
-      stroke-width: 10;
-      stroke: rgba(255, 14, 163, 0.8);
+    svg:not(.is-playing) .current-point {
+      stroke-width: 12;
+      stroke: rgba(255, 14, 163, .8);
+      fill: #fff;
     }
   </style>
 </head>
