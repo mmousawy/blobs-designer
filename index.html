@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Blobs designer</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      font-family: sans-serif;
+    }
+
+    .toolbar {
+      position: fixed;
+      justify-content: space-between;
+      left: 0;
+      bottom: 0;
+      display: flex;
+      width: 100%;
+      padding: 1rem;
+      background: slateblue;
+    }
+
+    .button {
+      appearance: none;
+      -webkit-appearance: none;
+      border: none;
+      border-radius: 2px;
+      font-size: inherit;
+      padding: .5em .75em;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    .button:active {
+      transform: scale(.95);
+      opacity: .9;
+    }
+
+    .button.is-hidden {
+      display: none;
+    }
+
+    circle {
+      stroke-width: 15;
+      stroke: transparent;
+      cursor: pointer;
+    }
+
+    path {
+      fill: rgba(50, 155, 151, .8);
+    }
+
+    .current-shape {
+      stroke: rgba(255, 14, 163, 0.8);
+      stroke-width: 5;
+    }
+
+    .current-point {
+      stroke-width: 10;
+      stroke: rgba(255, 14, 163, 0.8);
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <div class="toolbar__group">
+      <button class="button button__anchor">Anchor point [a]</button>
+      <button class="button button__release is-hidden" data-alt="button__anchor">Release point [a]</button>
+    </div>
+    <div class="toolbar__group">
+      <button class="button button__new_shape">New shape [n]</button>
+    </div>
+    <div class="toolbar__group">
+      <button class="button button__play">Play [space]</button>
+      <button class="button button__pause is-hidden" data-alt="button__play">Pause [space]</button>
+    </div>
+    <div class="toolbar__group">
+      <button class="button button__export">Export [e]</button>
+    </div>
+  </div>
+  <script src="blobs-designer.js"></script>
+</body>
+</html>
