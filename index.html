@@ -52,6 +52,14 @@
       display: none;
     }
 
+    .toolbar.is-playing .designer-only > * {
+      display: none;
+    }
+
+    svg {
+      user-select: none;
+    }
+
     circle {
       fill: transparent;
       stroke-width: 15;
@@ -60,32 +68,50 @@
     }
 
     svg:not(.is-playing) circle {
-      fill: #45388b;
-      cursor: pointer;
+      fill: transparent;
+      cursor: grab;
+      pointer-events: none;
     }
 
     path {
       fill: rgba(50, 155, 151, .8);
     }
 
-    svg:not(.is-playing) .current-shape {
-      stroke: rgba(255, 14, 163, .8);
-      stroke-width: 5;
+    svg:not(.is-playing) path {
+      cursor: -webkit-grab;
+      cursor: grab;
     }
 
     svg:not(.is-playing) .assoc-shape {
-      stroke: rgba(255, 14, 163, .5);
+      stroke: rgba(167, 14, 255, 0.5);
       stroke-width: 3;
+    }
+
+    svg:not(.is-playing) .current-shape {
+      stroke: rgba(255, 14, 163, .7);
+      stroke-width: 5;
+    }
+
+    svg:not(.is-playing) .assoc-point {
+      fill: #45388b;
+      stroke-width: 15;
+      pointer-events: auto;
     }
 
     svg:not(.is-playing) .next-point {
       stroke-width: 12;
-      stroke: rgba(14, 187, 255, 0.8);
+      stroke: rgb(255, 164, 25, .8);
     }
 
     svg:not(.is-playing) .current-point {
       stroke-width: 12;
-      stroke: rgba(255, 14, 163, .8);
+      stroke: rgba(255, 14, 163, .7);
+    }
+
+    .is-dragging,
+    svg:not(.is-playing) .is-held {
+      cursor: -webkit-grabbing;
+      cursor: grabbing;
     }
 
     .keyboard-key {
@@ -108,10 +134,10 @@
 </head>
 <body>
   <div class="toolbar">
-    <div class="toolbar__group">
-      <button class="button button__anchor">Anchor point <span class="keyboard-key">a</span></button>
-      <button class="button button__release is-hidden" data-alt="button__anchor">Release point <span class="keyboard-key">a</span></button>
+    <div class="toolbar__group designer-only">
       <button class="button button__new_shape">New shape <span class="keyboard-key">n</span></button>
+      <button class="button button__anchor is-hidden">Anchor point <span class="keyboard-key">a</span></button>
+      <button class="button button__release is-hidden" data-alt="button__anchor">Release point <span class="keyboard-key">a</span></button>
     </div>
     <div class="toolbar__group">
         <button class="button button__play">Play <span class="keyboard-key">space</span></button>

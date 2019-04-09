@@ -14,13 +14,18 @@ class Blob {
     let pointIndex = 0;
 
     // Move to first point
-    const lastPoint = this.points[this.points.length - 1].position;
-    const firstPoint = this.points[0].position;
+    let startPoint;
+    let lastPoint = this.points[this.points.length - 1].position;
+    let firstPoint = this.points[0].position;
 
-    const startPoint = {
-      x: (lastPoint.x + firstPoint.x) / 2,
-      y: (lastPoint.y + firstPoint.y) / 2
-    };
+    if (this.points[this.points.length - 1].anchored) {
+      startPoint = lastPoint;
+    } else {
+      startPoint = {
+        x: (lastPoint.x + firstPoint.x) / 2,
+        y: (lastPoint.y + firstPoint.y) / 2
+      };
+    }
 
     pathParts.push(`M${startPoint.x}, ${startPoint.y}`);
 
@@ -29,27 +34,34 @@ class Blob {
       const currentPoint = this.points[pointIndex].position;
       const nextPoint = this.points[pointIndex + 1].position;
 
-      const controlPoint = {
-        x: (currentPoint.x + nextPoint.x) / 2,
-        y: (currentPoint.y + nextPoint.y) / 2
-      };
+      if (this.points[pointIndex].anchored) {
+        pathParts.push(`L${currentPoint.x}, ${currentPoint.y}`);
+      } else {
+        const controlPoint = {
+          x: (currentPoint.x + nextPoint.x) / 2,
+          y: (currentPoint.y + nextPoint.y) / 2
+        };
 
-      pathParts.push(`Q${currentPoint.x}, ${currentPoint.y}`);
-      pathParts.push(`${controlPoint.x}, ${controlPoint.y}`);
+        pathParts.push(`Q${currentPoint.x}, ${currentPoint.y}`);
+        pathParts.push(`${controlPoint.x}, ${controlPoint.y}`);
+      }
 
       pointIndex++;
     }
 
     // Add last curve
     const currentPoint = this.points[this.points.length - 1].position;
+    if (this.points[pointIndex].anchored) {
+      pathParts.push(`L${currentPoint.x}, ${currentPoint.y}`);
+    } else {
+      const endPoint = {
+        x: (currentPoint.x + firstPoint.x) / 2,
+        y: (currentPoint.y + firstPoint.y) / 2
+      };
 
-    const endPoint = {
-      x: (currentPoint.x + firstPoint.x) / 2,
-      y: (currentPoint.y + firstPoint.y) / 2
-    };
-
-    pathParts.push(`Q${currentPoint.x}, ${currentPoint.y}`);
-    pathParts.push(`${endPoint.x}, ${endPoint.y}`);
+      pathParts.push(`Q${currentPoint.x}, ${currentPoint.y}`);
+      pathParts.push(`${endPoint.x}, ${endPoint.y}`);
+    }
 
     utils.setProperties(this.blobPath, {
       d: pathParts.join(' ')
@@ -61,18 +73,49 @@ class Blob {
     window.canvas.insertAdjacentElement('afterbegin', this.blobPath)
   }
 
+  remove()
+  {
+    utils.setProperties(this.blobPath, {
+      d: ''
+    });
+  }
+
+  delete()
+  {
+    this.blobPath.remove();
+    blobDesigner.shapes.forEach((shape, index) => {
+      if (shape.points.length < 3) {
+        blobDesigner.shapes.splice(index, 1);
+      }
+    });
+  }
+
   deselect()
   {
     blobDesigner.currentShape = null;
     this.blobPath.classList.remove('current-shape');
+    this.blobPath.classList.remove('assoc-shape');
+
+    this.points.forEach(point => {
+      point.body.classList.remove('assoc-point');
+    });
+
+    if (this.points.length < 3) {
+      this.remove();
+      this.delete();
+    }
   }
 
   select()
   {
-    blobDesigner.currentShape && blobDesigner.currentShape.deselect();
+    blobDesigner.currentShape && blobDesigner.currentShape !== this && blobDesigner.currentShape.deselect();
     this.blobPath.classList.add('current-shape');
     blobDesigner.currentShape = this;
     blobDesigner.currentPoint && blobDesigner.currentPoint.deselect();
+
+    this.points.forEach(point => {
+      point.body.classList.add('assoc-point');
+    });
   }
 
   createPoint(position, index = null)
@@ -88,7 +131,7 @@ class Blob {
       this.points.splice(index + 1, 0, point);
     }
 
-    point.select();
+    return point;
   }
 }
 
@@ -96,6 +139,7 @@ class Point {
   constructor(props)
   {
     this.position = props.position;
+    this.anchored = false;
     this.anchor = {
       x: this.position.x,
       y: this.position.y
@@ -128,6 +172,9 @@ class Point {
 
     const nextPoint = blobDesigner.blobCanvas.canvas.querySelector('.next-point');
     nextPoint && nextPoint.classList.remove('next-point');
+
+    blobDesigner.buttons['anchor'].element.classList.add('is-hidden');
+    blobDesigner.buttons['release'].element.classList.add('is-hidden');
   }
 
   select()
@@ -137,6 +184,14 @@ class Point {
     blobDesigner.currentPoint = this;
     blobDesigner.currentShape.blobPath.classList.remove('current-shape');
     blobDesigner.currentShape.blobPath.classList.add('assoc-shape');
+
+    if (this.anchored) {
+      blobDesigner.buttons['anchor'].element.classList.add('is-hidden');
+      blobDesigner.buttons['release'].element.classList.remove('is-hidden');
+    } else {
+      blobDesigner.buttons['anchor'].element.classList.remove('is-hidden');
+      blobDesigner.buttons['release'].element.classList.add('is-hidden');
+    }
 
     // Highlight next point
     if (blobDesigner.currentShape.points.length > 1) {
@@ -245,6 +300,10 @@ class BlobCanvas
       let pointIndex = blob.points.length - 1;
 
       blob.points.forEach(point => {
+        if (point.anchored) {
+          return;
+        }
+
         const currentFrame = point.randomSeed + this.time;
 
         point.velocity.x += point.randomSeed4 * Math.cos(currentFrame / point.randomSeed2) * .2;
@@ -317,6 +376,7 @@ class BlobDesigner
     this.currentlyHolding = null;
 
     this.blobCanvas = new BlobCanvas();
+    this.toolbar = document.querySelector('.toolbar');
 
     this.initMouseEvents();
     this.initKeyboardEvents();
@@ -381,7 +441,7 @@ class BlobDesigner
   {
     if (this.paused) {
       if (event.ctrlKey && this.currentShape) {
-        this.currentShape.createPoint(
+        const newPoint = this.currentShape.createPoint(
           {
             x: event.clientX,
             y: event.clientY
@@ -393,8 +453,10 @@ class BlobDesigner
           this.currentShape.appendPath();
         }
 
-        if (this.currentShape.points.length > 2) {
+        if (this.currentShape.points.length) {
           this.currentShape.drawBody();
+          this.currentShape.select();
+          newPoint.select();
         }
 
         return;
@@ -423,6 +485,8 @@ class BlobDesigner
         foundPoint && foundPoint.select();
 
         this.currentlyHolding = foundPoint;
+        foundPoint.body.classList.add('is-held');
+        this.blobCanvas.canvas.classList.add('is-dragging');
 
         return;
       }
@@ -442,18 +506,24 @@ class BlobDesigner
         foundShape && foundShape.select();
 
         this.currentlyHolding = foundShape;
+        foundShape.blobPath.classList.add('is-held');
+        this.blobCanvas.canvas.classList.add('is-dragging');
 
         return;
       }
 
-      if (event.shiftKey) {
-        return;
-      }
+      this.currentPoint && this.currentPoint.deselect();
+      this.currentShape && this.currentShape.deselect();
+
+      event.preventDefault();
     }
   }
 
   mouseUpHandler(event)
   {
+    this.currentPoint && this.currentPoint.body.classList.remove('is-held');
+    this.currentShape && this.currentShape.blobPath.classList.remove('is-held');
+    this.blobCanvas.canvas.classList.remove('is-dragging');
     this.currentlyHolding = null;
   }
 
@@ -529,6 +599,7 @@ class BlobDesigner
       this.buttons['pause'].element.classList.remove('is-hidden');
 
       this.blobCanvas.canvas.classList.add('is-playing');
+      this.toolbar.classList.add('is-playing');
     } else {
       this.buttons['play'].element.classList.remove('is-hidden');
       this.buttons['pause'].element.classList.add('is-hidden');
@@ -541,17 +612,30 @@ class BlobDesigner
       });
 
       this.blobCanvas.canvas.classList.remove('is-playing');
+      this.toolbar.classList.remove('is-playing');
     }
   }
 
   newShapeHandler(event)
   {
-    if (this.currentShape.points.length > 2) {
+    if (this.paused) {
       this.currentPoint && this.currentPoint.deselect();
       this.currentShape && this.currentShape.deselect();
 
       this.currentShape = new Blob();
       this.shapes.push(this.currentShape);
+    }
+  }
+
+  anchorReleaseHandler(event)
+  {
+    if (this.paused && this.currentPoint)
+    {
+      this.currentPoint.anchored = !this.currentPoint.anchored;
+
+      blobDesigner.buttons['anchor'].element.classList.toggle('is-hidden');
+      blobDesigner.buttons['release'].element.classList.toggle('is-hidden');
+      this.currentShape.drawBody();
     }
   }
 
@@ -561,6 +645,7 @@ class BlobDesigner
       let index = this.currentShape.points.indexOf(this.currentPoint);
       this.currentShape.points.splice(index, 1);
       this.currentPoint.delete();
+      this.currentPoint.deselect();
 
       index -= 1;
 
@@ -572,6 +657,15 @@ class BlobDesigner
         this.currentShape.drawBody();
         this.currentShape.points[index].select();
       }
+    }
+
+    if (this.currentShape && !this.currentPoint) {
+      this.currentShape.points.forEach(point => {
+        point.delete();
+      });
+      this.currentShape.points = [];
+      this.currentShape.remove();
+      this.currentShape.select();
     }
   }
 }
