@@ -58,7 +58,7 @@ class Blob {
 
   appendPath()
   {
-    window.canvas.appendChild(this.blobPath);
+    window.canvas.insertAdjacentElement('afterbegin', this.blobPath)
   }
 
   deselect()
@@ -75,40 +75,45 @@ class Blob {
     blobDesigner.currentPoint && blobDesigner.currentPoint.deselect();
   }
 
-  createPoint(position)
+  createPoint(position, index = null)
   {
-    this.points.push({
-      position: position,
-      anchor: {
-        x: position.x,
-        y: position.y
-      },
-      velocity: {
-        x: 0,
-        y: 0
-      },
-      randomSeed: Math.random() * 1000,
-      randomSeed2: 15 + Math.random() * 5,
-      randomSeed3: 15 + Math.random() * 5,
-      randomSeed4: Math.random() * .5 + .5,
-      randomSeed5: Math.random() * .5 + .5,
-      object: new Point({
-        position,
-        hidden: false
-      })
+    const point = new Point({
+      position,
+      hidden: false
     });
+
+    if (index === this.points.length - 1) {
+      this.points.push(point);
+    } else {
+      this.points.splice(index + 1, 0, point);
+    }
+
+    point.select();
   }
 }
 
 class Point {
   constructor(props)
   {
+    this.position = props.position;
+    this.anchor = {
+      x: this.position.x,
+      y: this.position.y
+    };
+    this.velocity = {
+      x: 0,
+      y: 0
+    };
+    this.randomSeed = Math.random() * 1000,
+    this.randomSeed2 = 15 + Math.random() * 5,
+    this.randomSeed3 = 15 + Math.random() * 5,
+    this.randomSeed4 = Math.random() * .5 + .5,
+    this.randomSeed5 = Math.random() * .5 + .5,
+
     this.x = props.position.x;
     this.y = props.position.y;
     this.hidden = props.hidden || false;
     this.body = document.createElementNS(svgNamespace, 'circle');
-
-    this.select();
 
     if (!this.hidden) {
       window.canvas.appendChild(this.body);
@@ -120,6 +125,9 @@ class Point {
   {
     blobDesigner.currentPoint = null;
     this.body.classList.remove('current-point');
+
+    const nextPoint = blobDesigner.blobCanvas.canvas.querySelector('.next-point');
+    nextPoint && nextPoint.classList.remove('next-point');
   }
 
   select()
@@ -127,6 +135,27 @@ class Point {
     blobDesigner.currentPoint && blobDesigner.currentPoint.deselect();
     this.body.classList.add('current-point');
     blobDesigner.currentPoint = this;
+    blobDesigner.currentShape.blobPath.classList.remove('current-shape');
+    blobDesigner.currentShape.blobPath.classList.add('assoc-shape');
+
+    // Highlight next point
+    if (blobDesigner.currentShape.points.length > 1) {
+      let index = blobDesigner.currentShape.points.indexOf(this);
+
+      const nextPoint = blobDesigner.blobCanvas.canvas.querySelector('.next-point');
+      nextPoint && nextPoint.classList.remove('next-point');
+
+      if (index == blobDesigner.currentShape.points.length - 1) {
+        index = -1;
+      }
+
+      blobDesigner.currentShape.points[index + 1].body.classList.add('next-point');
+    }
+  }
+
+  delete()
+  {
+    this.body.remove();
   }
 
   draw()
@@ -169,11 +198,10 @@ class BlobCanvas
     document.body.appendChild(this.canvas);
     window.canvas = this.canvas;
 
-    // Start mousemove listener
-    window.addEventListener('mousemove', this.mouseHandler.bind(this));
+    this.mouseMoveHandlerBound = this.mouseMoveHandler.bind(this);
   }
 
-  mouseHandler(event)
+  mouseMoveHandler(event)
   {
     if (this.mousePosition.x) {
       this.mouseVelocity.x = event.clientX - this.mousePosition.x;
@@ -187,11 +215,18 @@ class BlobCanvas
   startAnimation()
   {
     this.animationFrameBound();
+
+    // Start mousemove listener
+    window.addEventListener('mousemove', this.mouseMoveHandlerBound);
   }
 
   animationFrame()
   {
     !blobDesigner.paused && window.requestAnimationFrame(this.animationFrameBound);
+
+    if (blobDesigner.paused) {
+      window.removeEventListener('mousemove', this.mouseMoveHandlerBound);
+    }
 
     const mouseRect = {
       top: this.mousePosition.y - this.mouseRadiusHalf,
@@ -209,8 +244,7 @@ class BlobCanvas
 
       let pointIndex = blob.points.length - 1;
 
-      while (pointIndex > -1) {
-        const point = blob.points[pointIndex];
+      blob.points.forEach(point => {
         const currentFrame = point.randomSeed + this.time;
 
         point.velocity.x += point.randomSeed4 * Math.cos(currentFrame / point.randomSeed2) * .2;
@@ -236,13 +270,13 @@ class BlobCanvas
         point.velocity.x *= .95;
         point.velocity.y *= .95;
 
-        point.object.x = point.position.x;
-        point.object.y = point.position.y;
+        point.x = point.position.x;
+        point.y = point.position.y;
 
-        point.object.draw();
+        point.draw();
 
         pointIndex--;
-      }
+      });
 
       blob.drawBody();
     }
@@ -268,8 +302,19 @@ class BlobDesigner
     this.paused = true;
     this.shapes = [];
 
+    this.mouseVelocity = {
+      x: null,
+      y: null
+    };
+
+    this.mousePosition = {
+      x: null,
+      y: null
+    };
+
     this.currentShape = null;
     this.currentPoint = null;
+    this.currentlyHolding = null;
 
     this.blobCanvas = new BlobCanvas();
 
@@ -320,13 +365,9 @@ class BlobDesigner
 
   initMouseEvents()
   {
-    this.blobCanvas.canvas.addEventListener('mousedown', (event) => {
-      this.mouseDownHandler(event);
-    });
-
-    this.blobCanvas.canvas.addEventListener('mouseup', (event) => {
-      this.mouseUpHandler(event);
-    });
+    this.blobCanvas.canvas.addEventListener('mousedown', this.mouseDownHandler.bind(this));
+    this.blobCanvas.canvas.addEventListener('mouseup', this.mouseUpHandler.bind(this));
+    this.blobCanvas.canvas.addEventListener('mousemove', this.mouseMoveHandler.bind(this));
   }
 
   initKeyboardEvents()
@@ -338,61 +379,108 @@ class BlobDesigner
 
   mouseDownHandler(event)
   {
-    if (event.target !== this.blobCanvas.canvas) {
-      return;
-    }
-
     if (this.paused) {
-      this.currentShape.createPoint({
-        x: event.clientX,
-        y: event.clientY
-      });
+      if (event.ctrlKey && this.currentShape) {
+        this.currentShape.createPoint(
+          {
+            x: event.clientX,
+            y: event.clientY
+          },
+          this.currentShape.points.indexOf(this.currentPoint)
+        );
 
-      if (this.currentShape.points.length == 2) {
-        this.currentShape.appendPath();
+        if (this.currentShape.points.length == 2) {
+          this.currentShape.appendPath();
+        }
+
+        if (this.currentShape.points.length > 2) {
+          this.currentShape.drawBody();
+        }
+
+        return;
       }
 
-      if (this.currentShape.points.length > 2) {
-        this.currentShape.drawBody();
+      let foundShape, foundPoint;
+
+      // Select point
+      if (event.target.nodeName === 'circle') {
+        this.shapes.forEach(shape => {
+          if (!foundPoint) {
+            shape.points.forEach(point => {
+              if (!foundPoint) {
+                if (point.body === event.target) {
+                  foundPoint = point;
+                }
+              }
+
+              if (foundPoint) {
+                shape.select();
+              }
+            });
+          }
+        });
+
+        foundPoint && foundPoint.select();
+
+        this.currentlyHolding = foundPoint;
+
+        return;
+      }
+
+      // Select shape
+      if (event.target.nodeName === 'path') {
+
+        this.shapes.forEach(shape => {
+          if (!foundShape) {
+            if (shape.blobPath === event.target) {
+              foundShape = shape;
+            }
+          }
+        });
+
+        foundPoint && foundPoint.select();
+        foundShape && foundShape.select();
+
+        this.currentlyHolding = foundShape;
+
+        return;
+      }
+
+      if (event.shiftKey) {
+        return;
       }
     }
   }
 
   mouseUpHandler(event)
   {
-    let foundShape, foundPoint;
+    this.currentlyHolding = null;
+  }
 
-    // Select point
-    if (event.target.nodeName === 'circle' && !event.target.classList.contains('current-point')) {
-
-      this.shapes.forEach(shape => {
-        if (!foundPoint) {
-          shape.points.forEach(point => {
-            if (!foundPoint) {
-              if (point.object.body === event.target) {
-                foundPoint = point.object;
-              }
-            }
-          });
-        }
-      });
-
-      foundPoint && foundPoint.select();
+  mouseMoveHandler(event)
+  {
+    if (this.mousePosition.x) {
+      this.mouseVelocity.x = event.clientX - this.mousePosition.x;
+      this.mouseVelocity.y = event.clientY - this.mousePosition.y;
     }
 
-    // Select shape
-    if (event.target.nodeName === 'path' && !event.target.classList.contains('current-shape')) {
+    this.mousePosition.x = event.clientX;
+    this.mousePosition.y = event.clientY;
 
-      this.shapes.forEach(shape => {
-        if (!foundShape) {
-          if (shape.blobPath === event.target) {
-            foundShape = shape;
-          }
-        }
-      });
+    if (event.buttons === 1 && this.currentlyHolding) {
+      if (this.currentlyHolding.constructor === Blob) {
+        this.currentlyHolding.points.forEach(point => {
+          point.x = point.position.x = point.anchor.x += this.mouseVelocity.x;
+          point.y = point.position.y = point.anchor.y += this.mouseVelocity.y;
+          point.draw();
+        });
+      } else {
+        this.currentlyHolding.x = this.currentlyHolding.position.x = this.currentlyHolding.anchor.x += this.mouseVelocity.x;
+        this.currentlyHolding.y = this.currentlyHolding.position.y = this.currentlyHolding.anchor.y += this.mouseVelocity.y;
+        this.currentPoint.draw();
+      }
 
-      foundPoint && foundPoint.select();
-      foundShape && foundShape.select();
+      this.currentShape.drawBody();
     }
   }
 
@@ -419,6 +507,12 @@ class BlobDesigner
     // E
     if (event.keyCode === 69) {
       this.exportHandler();
+      event.preventDefault();
+    }
+
+    // Delete
+    if (event.keyCode === 46) {
+      this.deleteHandler();
       event.preventDefault();
     }
   }
@@ -458,6 +552,26 @@ class BlobDesigner
 
       this.currentShape = new Blob();
       this.shapes.push(this.currentShape);
+    }
+  }
+
+  deleteHandler(event)
+  {
+    if (this.currentPoint) {
+      let index = this.currentShape.points.indexOf(this.currentPoint);
+      this.currentShape.points.splice(index, 1);
+      this.currentPoint.delete();
+
+      index -= 1;
+
+      if (index < 0) {
+        index = 0;
+      }
+
+      if (this.currentShape.points.length > 0) {
+        this.currentShape.drawBody();
+        this.currentShape.points[index].select();
+      }
     }
   }
 }
