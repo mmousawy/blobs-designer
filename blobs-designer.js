@@ -440,7 +440,7 @@ class BlobDesigner
   mouseDownHandler(event)
   {
     if (this.paused) {
-      if (event.ctrlKey && this.currentShape) {
+      if (event.metaKey && this.currentShape) {
         const newPoint = this.currentShape.createPoint(
           {
             x: event.clientX,
