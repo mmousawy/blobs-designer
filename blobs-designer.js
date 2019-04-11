@@ -489,7 +489,7 @@ class BlobDesigner
   mouseDownHandler(event)
   {
     if (this.paused) {
-      if (event.metaKey && this.currentShape) {
+      if ((event.metaKey || event.ctrlKey) && this.currentShape) {
         let pointPos;
 
         pointPos = {
@@ -645,7 +645,7 @@ class BlobDesigner
 
   keyDownHandler(event)
   {
-    if (event.metaKey || event.shiftKey) {
+    if (event.metaKey || event.ctrlKey || event.shiftKey) {
       return;
     }
 
