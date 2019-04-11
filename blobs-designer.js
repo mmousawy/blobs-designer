@@ -846,7 +846,7 @@ class BlobDesigner
         });
       });
 
-      this.exportModalContent.value = JSON.stringify(exportContent, true, 2);
+      this.exportModalContent.value = JSON.stringify(exportContent, true);
       this.exportModalContent.focus();
     } else {
       this.toolbar.classList.remove('is-overlayed');
