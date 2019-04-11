@@ -117,6 +117,7 @@ class Blob {
     if (this.points.length < 3) {
       this.remove();
       this.delete();
+      this.shapeGroup.remove();
     }
   }
 
@@ -834,6 +835,8 @@ class BlobDesigner
 
     this.toggleModalExport();
     if (this.modalOverlayExport) {
+      this.currentPoint && this.currentPoint.deselect();
+      this.currentShape && this.currentShape.deselect();
       this.toolbar.classList.add('is-overlayed');
       const exportContent = JSON.parse(JSON.stringify(this.shapes, true));
 
