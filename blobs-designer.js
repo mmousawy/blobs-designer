@@ -132,11 +132,11 @@ class Blob {
     });
   }
 
-  createPoint(position, index = null)
+  createPoint(position, index = null, anchored = false)
   {
     const point = new Point({
       position,
-      hidden: false
+      anchored
     });
 
     if (index === this.points.length - 1) {
@@ -153,7 +153,7 @@ class Point {
   constructor(props)
   {
     this.position = props.position;
-    this.anchored = false;
+    this.anchored = props.anchored;
     this.anchor = {
       x: this.position.x,
       y: this.position.y
@@ -307,13 +307,7 @@ class BlobCanvas
       left: this.mousePosition.x - this.mouseRadiusHalf
     };
 
-    for (let blobIndex = 0; blobIndex < this.blobs.length; blobIndex++) {
-      const blob = this.blobs[blobIndex];
-
-      if (blob.points.length < 3) {
-        continue;
-      }
-
+    this.blobs.forEach(blob => {
       blob.points.forEach(point => {
         if (point.anchored) {
           return;
@@ -324,15 +318,20 @@ class BlobCanvas
         point.velocity.x += point.randomSeeds[3] * Math.cos(currentFrame / point.randomSeeds[1]) * .2;
         point.velocity.y -= point.randomSeeds[4] * Math.sin(currentFrame / point.randomSeeds[2]) * .2;
 
+        const pointCanvasPosition = {
+          x: blob.position.x + point.x,
+          y: blob.position.y + point.y
+        };
+
         // Check bluntly if the point is in distance to be affected by the mouse radius
-        if (point.position.x > mouseRect.left && point.position.x < mouseRect.right && point.position.y > mouseRect.top && point.position.y < mouseRect.bottom) {
-          const deltaX = point.position.x - this.mousePosition.x;
-          const deltaY = point.position.y - this.mousePosition.y;
-          const strength = Math.max(0, this.mouseRadiusHalf - Math.hypot(deltaX, deltaY)) * .02;
+        if (pointCanvasPosition.x > mouseRect.left && pointCanvasPosition.x < mouseRect.right && pointCanvasPosition.y > mouseRect.top && pointCanvasPosition.y < mouseRect.bottom) {
+          const deltaX = pointCanvasPosition.x - this.mousePosition.x;
+          const deltaY = pointCanvasPosition.y - this.mousePosition.y;
+          const strength = Math.max(0, this.mouseRadiusHalf - Math.hypot(deltaX, deltaY)) * .01;
           const mouseAngle = Math.atan2(deltaY, deltaX);
 
           point.velocity.x += Math.cos(mouseAngle) * strength;
-          point.velocity.y += Math.sin(mouseAngle) * strength
+          point.velocity.y += Math.sin(mouseAngle) * strength;
         }
 
         point.velocity.x += (point.anchor.x - point.position.x) * .01;
@@ -349,7 +348,7 @@ class BlobCanvas
       });
 
       blob.drawPath();
-    }
+    });
 
     this.time++;
   }
@@ -645,6 +644,10 @@ class BlobDesigner
 
   keyDownHandler(event)
   {
+    if (event.metaKey || event.shiftKey) {
+      return;
+    }
+
     if (!this.modalOverlayExport && !this.modalOverlayImport) {
       // N
       if (event.keyCode === 78) {
@@ -803,7 +806,7 @@ class BlobDesigner
         this.currentShape = new Blob(shape.anchor);
 
         shape.points.forEach(point => {
-          this.currentShape.createPoint(point.anchor);
+          this.currentShape.createPoint(point.anchor, null, point.anchored || false);
         });
 
         this.shapes.push(this.currentShape);
