@@ -23,11 +23,13 @@
 
     .toolbar {
       position: fixed;
+      align-items: center;
       justify-content: space-between;
       left: 0;
       bottom: 0;
       display: flex;
       width: 100%;
+      height: 4.25rem;
       padding: 1rem;
       background: #45388b;
     }
@@ -52,7 +54,8 @@
       display: none;
     }
 
-    .toolbar.is-playing .designer-only > * {
+    .toolbar.is-playing .designer-only > *,
+    .toolbar.is-overlayed .designer-only > * {
       display: none;
     }
 
@@ -60,14 +63,7 @@
       user-select: none;
     }
 
-    circle {
-      fill: transparent;
-      stroke-width: 15;
-      stroke: transparent;
-      z-index: 2;
-    }
-
-    svg:not(.is-playing) circle {
+    .is-paused circle {
       fill: transparent;
       cursor: grab;
       pointer-events: none;
@@ -77,39 +73,53 @@
       fill: rgba(50, 155, 151, .8);
     }
 
-    svg:not(.is-playing) path {
+    svg {
+      overflow: hidden;
+    }
+
+    svg > svg {
+      overflow: visible;
+    }
+
+    circle {
+      visibility: hidden;
+    }
+
+    .is-paused path {
       cursor: -webkit-grab;
       cursor: grab;
     }
 
-    svg:not(.is-playing) .assoc-shape {
+    .is-paused .assoc-shape {
       stroke: rgba(167, 14, 255, 0.5);
       stroke-width: 3;
     }
 
-    svg:not(.is-playing) .current-shape {
+    .is-paused .current-shape {
       stroke: rgba(255, 14, 163, .7);
       stroke-width: 5;
     }
 
-    svg:not(.is-playing) .assoc-point {
+    .is-paused .assoc-point {
+      visibility: visible;
       fill: #45388b;
       stroke-width: 15;
+      stroke: transparent;
       pointer-events: auto;
     }
 
-    svg:not(.is-playing) .next-point {
+    .is-paused .next-point {
       stroke-width: 12;
       stroke: rgb(255, 164, 25, .8);
     }
 
-    svg:not(.is-playing) .current-point {
+    .is-paused .current-point {
       stroke-width: 12;
       stroke: rgba(255, 14, 163, .7);
     }
 
     .is-dragging,
-    svg:not(.is-playing) .is-held {
+    .is-paused .is-held {
       cursor: -webkit-grabbing;
       cursor: grabbing;
     }
@@ -130,6 +140,40 @@
       white-space: nowrap;
       vertical-align: top;
     }
+
+    .export-modal,
+    .import-modal {
+      position: fixed;
+      top: 0;
+      bottom: 4.25rem;
+      width: 100%;
+      background: rgba(12,13,14,0.9);
+    }
+
+    .export-modal.is-hidden,
+    .import-modal.is-hidden {
+      display: none;
+    }
+
+    .export-modal__content,
+    .import-modal__content {
+      width: 100%;
+      height: 100%;
+      padding: 1rem;
+      background: transparent;
+      border: 0;
+      color: #adb3b9;
+      font-family: 'Menlo', monospace;
+      font-size: 1rem;
+      line-height: 1.5em;
+      white-space: pre;
+      resize: none;
+    }
+
+    .is-playing circle {
+      fill: transparent;
+      stroke: transparent;
+    }
   </style>
 </head>
 <body>
@@ -140,10 +184,19 @@
       <button class="button button__release is-hidden" data-alt="button__anchor">Release point <span class="keyboard-key">a</span></button>
     </div>
     <div class="toolbar__group">
-        <button class="button button__play">Play <span class="keyboard-key">space</span></button>
-        <button class="button button__pause is-hidden" data-alt="button__play">Pause <span class="keyboard-key">space</span></button>
+      <button class="button button__play">Play <span class="keyboard-key">space</span></button>
+      <button class="button button__pause is-hidden" data-alt="button__play">Pause <span class="keyboard-key">space</span></button>
+      <button class="button button__import">Import <span class="keyboard-key">i</span></button>
+      <button class="button button__import_close is-hidden">Close <span class="keyboard-key">i</span></button>
       <button class="button button__export">Export <span class="keyboard-key">e</span></button>
+      <button class="button button__export_close is-hidden">Close <span class="keyboard-key">e</span></button>
     </div>
+  </div>
+  <div class="export-modal is-hidden">
+    <textarea class="export-modal__content"></textarea>
+  </div>
+  <div class="import-modal is-hidden">
+    <textarea class="import-modal__content"></textarea>
   </div>
   <script src="blobs-designer.js"></script>
 </body>

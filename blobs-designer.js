@@ -1,14 +1,23 @@
 class Blob {
-  constructor()
+  constructor(anchor)
   {
     this.points = [];
 
-    this.blobPath = document.createElementNS(svgNamespace, 'path');
+    this.shapeGroup = document.createElementNS(svgNamespace, 'svg');
+    this.shapePath = document.createElementNS(svgNamespace, 'path');
+    this.position = {
+      x: 0,
+      y: 0
+    };
+    this.anchor = anchor || {
+      x: 0,
+      y: 0
+    };
 
     this.select();
   }
 
-  drawBody()
+  drawPath()
   {
     const pathParts = [];
     let pointIndex = 0;
@@ -63,26 +72,31 @@ class Blob {
       pathParts.push(`${endPoint.x}, ${endPoint.y}`);
     }
 
-    utils.setProperties(this.blobPath, {
+    utils.setProperties(this.shapePath, {
       d: pathParts.join(' ')
     });
   }
 
   appendPath()
   {
-    window.canvas.insertAdjacentElement('afterbegin', this.blobPath)
+    this.shapeGroup.appendChild(this.shapePath);
+    utils.setProperties(this.shapeGroup, {
+      x: this.anchor.x,
+      y: this.anchor.y
+    });
+    window.canvas.insertAdjacentElement('afterbegin', this.shapeGroup);
   }
 
   remove()
   {
-    utils.setProperties(this.blobPath, {
+    utils.setProperties(this.shapePath, {
       d: ''
     });
   }
 
   delete()
   {
-    this.blobPath.remove();
+    this.shapePath.remove();
     blobDesigner.shapes.forEach((shape, index) => {
       if (shape.points.length < 3) {
         blobDesigner.shapes.splice(index, 1);
@@ -93,8 +107,8 @@ class Blob {
   deselect()
   {
     blobDesigner.currentShape = null;
-    this.blobPath.classList.remove('current-shape');
-    this.blobPath.classList.remove('assoc-shape');
+    this.shapePath.classList.remove('current-shape');
+    this.shapePath.classList.remove('assoc-shape');
 
     this.points.forEach(point => {
       point.body.classList.remove('assoc-point');
@@ -109,7 +123,7 @@ class Blob {
   select()
   {
     blobDesigner.currentShape && blobDesigner.currentShape !== this && blobDesigner.currentShape.deselect();
-    this.blobPath.classList.add('current-shape');
+    this.shapePath.classList.add('current-shape');
     blobDesigner.currentShape = this;
     blobDesigner.currentPoint && blobDesigner.currentPoint.deselect();
 
@@ -148,21 +162,25 @@ class Point {
       x: 0,
       y: 0
     };
-    this.randomSeed = Math.random() * 1000,
-    this.randomSeed2 = 15 + Math.random() * 5,
-    this.randomSeed3 = 15 + Math.random() * 5,
-    this.randomSeed4 = Math.random() * .5 + .5,
-    this.randomSeed5 = Math.random() * .5 + .5,
+    this.randomSeeds = [
+      Math.random() * 1000,
+      15 + Math.random() * 5,
+      15 + Math.random() * 5,
+      Math.random() * .5 + .5,
+      Math.random() * .5 + .5
+    ];
 
     this.x = props.position.x;
     this.y = props.position.y;
     this.hidden = props.hidden || false;
     this.body = document.createElementNS(svgNamespace, 'circle');
 
-    if (!this.hidden) {
-      window.canvas.appendChild(this.body);
-      this.draw();
-    }
+    blobDesigner.currentShape.shapeGroup.appendChild(this.body);
+
+    utils.setProperties(this.body, {
+      r: 3
+    });
+    this.draw();
   }
 
   deselect()
@@ -182,8 +200,8 @@ class Point {
     blobDesigner.currentPoint && blobDesigner.currentPoint.deselect();
     this.body.classList.add('current-point');
     blobDesigner.currentPoint = this;
-    blobDesigner.currentShape.blobPath.classList.remove('current-shape');
-    blobDesigner.currentShape.blobPath.classList.add('assoc-shape');
+    blobDesigner.currentShape.shapePath.classList.remove('current-shape');
+    blobDesigner.currentShape.shapePath.classList.add('assoc-shape');
 
     if (this.anchored) {
       blobDesigner.buttons['anchor'].element.classList.add('is-hidden');
@@ -218,8 +236,7 @@ class Point {
     if (!this.hidden) {
       utils.setProperties(this.body, {
         cx: this.x,
-        cy: this.y,
-        r: 3
+        cy: this.y
       });
     }
   }
@@ -297,17 +314,15 @@ class BlobCanvas
         continue;
       }
 
-      let pointIndex = blob.points.length - 1;
-
       blob.points.forEach(point => {
         if (point.anchored) {
           return;
         }
 
-        const currentFrame = point.randomSeed + this.time;
+        const currentFrame = point.randomSeeds[0] + this.time;
 
-        point.velocity.x += point.randomSeed4 * Math.cos(currentFrame / point.randomSeed2) * .2;
-        point.velocity.y -= point.randomSeed5 * Math.sin(currentFrame / point.randomSeed3) * .2;
+        point.velocity.x += point.randomSeeds[3] * Math.cos(currentFrame / point.randomSeeds[1]) * .2;
+        point.velocity.y -= point.randomSeeds[4] * Math.sin(currentFrame / point.randomSeeds[2]) * .2;
 
         // Check bluntly if the point is in distance to be affected by the mouse radius
         if (point.position.x > mouseRect.left && point.position.x < mouseRect.right && point.position.y > mouseRect.top && point.position.y < mouseRect.bottom) {
@@ -331,13 +346,9 @@ class BlobCanvas
 
         point.x = point.position.x;
         point.y = point.position.y;
-
-        point.draw();
-
-        pointIndex--;
       });
 
-      blob.drawBody();
+      blob.drawPath();
     }
 
     this.time++;
@@ -349,7 +360,7 @@ class BlobUtils
   setProperties(element, obj)
   {
     for (let prop in obj) {
-      element.setAttribute(prop, obj[prop])
+      element.setAttribute(prop, obj[prop]);
     }
   }
 }
@@ -359,6 +370,7 @@ class BlobDesigner
   constructor()
   {
     this.paused = true;
+    this.modalOverlayExport = false;
     this.shapes = [];
 
     this.mouseVelocity = {
@@ -376,10 +388,16 @@ class BlobDesigner
     this.currentlyHolding = null;
 
     this.blobCanvas = new BlobCanvas();
+    this.blobCanvas.canvas.classList.add('is-paused');
     this.toolbar = document.querySelector('.toolbar');
+    this.exportModal = document.querySelector('.export-modal');
+    this.exportModalContent = document.querySelector('.export-modal__content');
+    this.importModal = document.querySelector('.import-modal');
+    this.importModalContent = document.querySelector('.import-modal__content');
 
     this.initMouseEvents();
     this.initKeyboardEvents();
+    this.initWindowEvents();
 
     // Buttons
     this.buttons = {
@@ -393,19 +411,31 @@ class BlobDesigner
       },
       anchor: {
         element: document.querySelector('.button__anchor'),
-        callback: this.handleButtonAnchor
+        callback: this.anchorReleaseHandler
       },
       release: {
         element: document.querySelector('.button__release'),
-        callback: this.handleButtonRelease
+        callback: this.anchorReleaseHandler
       },
       new_shape: {
         element: document.querySelector('.button__new_shape'),
         callback: this.newShapeHandler
       },
+      import: {
+        element: document.querySelector('.button__import'),
+        callback: this.importHandler
+      },
+      import_close: {
+        element: document.querySelector('.button__import_close'),
+        callback: this.importHandler
+      },
       export: {
         element: document.querySelector('.button__export'),
-        callback: this.handleButtonExport
+        callback: this.exportHandler
+      },
+      export_close: {
+        element: document.querySelector('.button__export_close'),
+        callback: this.exportHandler
       }
     };
 
@@ -432,8 +462,27 @@ class BlobDesigner
 
   initKeyboardEvents()
   {
-    window.addEventListener('keydown', (event) => {
-      this.keyDownHandler(event);
+    window.addEventListener('keydown', this.keyDownHandler.bind(this));
+  }
+
+  initWindowEvents()
+  {
+    window.addEventListener('resize', this.resizeHandler.bind(this));
+  }
+
+  resizeHandler(event)
+  {
+    utils.setProperties(this.blobCanvas.canvas, {
+      width: window.innerWidth,
+      height: window.innerHeight
+    });
+
+    blobDesigner.shapes.forEach(shape => {
+      if (shape.points[0]) {
+        const shapeRect = shape.points[0].body.getBoundingClientRect();
+        shape.position.x = shapeRect.x;
+        shape.position.y = shapeRect.y;
+      }
     });
   }
 
@@ -441,20 +490,52 @@ class BlobDesigner
   {
     if (this.paused) {
       if (event.metaKey && this.currentShape) {
+        let pointPos;
+
+        pointPos = {
+          x: 0,
+          y: 0
+        };
+
+        const prevPos = this.currentShape.position;
+
+        const deltaPos = {
+          x: prevPos.x - event.clientX,
+          y: prevPos.y - event.clientY
+        };
+
+        if (this.currentShape.points.length === 0) {
+          this.currentShape.position.x = event.clientX;
+          this.currentShape.position.y = event.clientY;
+
+          this.currentShape.anchor.x = `${parseFloat(((event.clientX / window.innerWidth) * 100).toFixed(2))}%`;
+          this.currentShape.anchor.y = `${parseFloat(((event.clientY / window.innerHeight) * 100).toFixed(2))}%`;
+        }
+
+        utils.setProperties(this.currentShape.shapeGroup, {
+          x: this.currentShape.anchor.x,
+          y: this.currentShape.anchor.y
+        });
+
+        if (this.currentShape.points.length == 0) {
+          this.currentShape.appendPath();
+        }
+
+        pointPos = {
+          x: event.clientX - this.currentShape.position.x,
+          y: event.clientY - this.currentShape.position.y
+        };
+
         const newPoint = this.currentShape.createPoint(
           {
-            x: event.clientX,
-            y: event.clientY
+            x: pointPos.x,
+            y: pointPos.y
           },
           this.currentShape.points.indexOf(this.currentPoint)
         );
 
-        if (this.currentShape.points.length == 2) {
-          this.currentShape.appendPath();
-        }
-
         if (this.currentShape.points.length) {
-          this.currentShape.drawBody();
+          this.currentShape.drawPath();
           this.currentShape.select();
           newPoint.select();
         }
@@ -496,7 +577,7 @@ class BlobDesigner
 
         this.shapes.forEach(shape => {
           if (!foundShape) {
-            if (shape.blobPath === event.target) {
+            if (shape.shapePath === event.target) {
               foundShape = shape;
             }
           }
@@ -506,7 +587,7 @@ class BlobDesigner
         foundShape && foundShape.select();
 
         this.currentlyHolding = foundShape;
-        foundShape.blobPath.classList.add('is-held');
+        foundShape.shapePath.classList.add('is-held');
         this.blobCanvas.canvas.classList.add('is-dragging');
 
         return;
@@ -522,55 +603,77 @@ class BlobDesigner
   mouseUpHandler(event)
   {
     this.currentPoint && this.currentPoint.body.classList.remove('is-held');
-    this.currentShape && this.currentShape.blobPath.classList.remove('is-held');
+    this.currentShape && this.currentShape.shapePath.classList.remove('is-held');
     this.blobCanvas.canvas.classList.remove('is-dragging');
     this.currentlyHolding = null;
   }
 
   mouseMoveHandler(event)
   {
-    if (this.mousePosition.x) {
-      this.mouseVelocity.x = event.clientX - this.mousePosition.x;
-      this.mouseVelocity.y = event.clientY - this.mousePosition.y;
-    }
+    this.mouseVelocity.x = event.clientX - this.mousePosition.x;
+    this.mouseVelocity.y = event.clientY - this.mousePosition.y;
 
     this.mousePosition.x = event.clientX;
     this.mousePosition.y = event.clientY;
 
     if (event.buttons === 1 && this.currentlyHolding) {
       if (this.currentlyHolding.constructor === Blob) {
-        this.currentlyHolding.points.forEach(point => {
-          point.x = point.position.x = point.anchor.x += this.mouseVelocity.x;
-          point.y = point.position.y = point.anchor.y += this.mouseVelocity.y;
-          point.draw();
+        this.currentlyHolding.position.x += this.mouseVelocity.x;
+        this.currentlyHolding.position.y += this.mouseVelocity.y;
+        this.currentlyHolding.anchor.x = `${parseFloat(((this.currentlyHolding.position.x / window.innerWidth) * 100).toFixed(2))}%`;
+        this.currentlyHolding.anchor.y = `${parseFloat(((this.currentlyHolding.position.y / window.innerHeight) * 100).toFixed(2))}%`;
+
+        utils.setProperties(this.currentlyHolding.shapeGroup, {
+          x: this.currentlyHolding.anchor.x,
+          y: this.currentlyHolding.anchor.y
         });
+
+        // this.currentlyHolding.points.forEach(point => {
+        //   point.x = point.anchor.x += this.mouseVelocity.x;
+        //   point.y = point.anchor.y += this.mouseVelocity.y;
+        //   point.draw();
+        // });
       } else {
         this.currentlyHolding.x = this.currentlyHolding.position.x = this.currentlyHolding.anchor.x += this.mouseVelocity.x;
         this.currentlyHolding.y = this.currentlyHolding.position.y = this.currentlyHolding.anchor.y += this.mouseVelocity.y;
         this.currentPoint.draw();
       }
 
-      this.currentShape.drawBody();
+      this.currentShape.drawPath();
     }
   }
 
   keyDownHandler(event)
   {
+    if (!this.modalOverlayExport && !this.modalOverlayImport) {
+      // N
+      if (event.keyCode === 78) {
+        this.newShapeHandler();
+        event.preventDefault();
+      }
+
+      // A
+      if (event.keyCode === 65) {
+        this.anchorReleaseHandler();
+        event.preventDefault();
+      }
+
+      // Delete
+      if (event.keyCode === 46) {
+        this.deleteHandler();
+        event.preventDefault();
+      }
+    }
+
     // Space
     if (event.keyCode === 32) {
       this.playPauseHandler();
       event.preventDefault();
     }
 
-    // N
-    if (event.keyCode === 78) {
-      this.newShapeHandler();
-      event.preventDefault();
-    }
-
-    // A
-    if (event.keyCode === 65) {
-      this.anchorReleaseHandler();
+    // I
+    if (event.keyCode === 73) {
+      this.importHandler();
       event.preventDefault();
     }
 
@@ -580,16 +683,23 @@ class BlobDesigner
       event.preventDefault();
     }
 
-    // Delete
-    if (event.keyCode === 46) {
-      this.deleteHandler();
-      event.preventDefault();
+    // Escape
+    if (event.keyCode === 27) {
+      if (this.modalOverlayImport) {
+        this.importHandler();
+      }
+
+      if (this.modalOverlayExport) {
+        this.exportHandler();
+      }
     }
   }
 
   playPauseHandler(event)
   {
     this.paused = !this.paused;
+    this.blobCanvas.canvas.classList.toggle('is-paused');
+    this.blobCanvas.canvas.classList.toggle('is-playing');
 
     if (!this.paused) {
       this.blobCanvas.blobs = this.shapes;
@@ -635,12 +745,16 @@ class BlobDesigner
 
       blobDesigner.buttons['anchor'].element.classList.toggle('is-hidden');
       blobDesigner.buttons['release'].element.classList.toggle('is-hidden');
-      this.currentShape.drawBody();
+      this.currentShape.drawPath();
     }
   }
 
   deleteHandler(event)
   {
+    if (!this.paused) {
+      return;
+    }
+
     if (this.currentPoint) {
       let index = this.currentShape.points.indexOf(this.currentPoint);
       this.currentShape.points.splice(index, 1);
@@ -654,7 +768,7 @@ class BlobDesigner
       }
 
       if (this.currentShape.points.length > 0) {
-        this.currentShape.drawBody();
+        this.currentShape.drawPath();
         this.currentShape.points[index].select();
       }
     }
