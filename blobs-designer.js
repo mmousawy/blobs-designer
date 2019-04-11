@@ -782,6 +782,91 @@ class BlobDesigner
       this.currentShape.select();
     }
   }
+
+  importHandler(event)
+  {
+    this.buttons['export'].element.classList.remove('is-hidden');
+    this.buttons['export_close'].element.classList.add('is-hidden');
+    this.exportModal.classList.add('is-hidden');
+
+    this.toggleModalImport();
+    if (this.modalOverlayImport) {
+      this.toolbar.classList.add('is-overlayed');
+      this.importModalContent.value = '';
+      this.importModalContent.focus();
+    } else {
+      this.toolbar.classList.remove('is-overlayed');
+
+      const importData = JSON.parse(this.importModalContent.value);
+
+      importData.forEach(shape => {
+        this.currentShape = new Blob(shape.anchor);
+
+        shape.points.forEach(point => {
+          this.currentShape.createPoint(point.anchor);
+        });
+
+        this.shapes.push(this.currentShape);
+        this.currentShape.drawPath();
+        this.currentShape.appendPath();
+      });
+
+      this.resizeHandler();
+    }
+
+    this.buttons['import'].element.classList.toggle('is-hidden');
+    this.buttons['import_close'].element.classList.toggle('is-hidden');
+  }
+
+  exportHandler(event)
+  {
+    this.buttons['import'].element.classList.remove('is-hidden');
+    this.buttons['import_close'].element.classList.add('is-hidden');
+    this.importModal.classList.add('is-hidden');
+
+    this.toggleModalExport();
+    if (this.modalOverlayExport) {
+      this.toolbar.classList.add('is-overlayed');
+      const exportContent = JSON.parse(JSON.stringify(this.shapes, true));
+
+      exportContent.forEach(shape => {
+        delete shape.shapePath;
+        delete shape.shapeGroup;
+        delete shape.position;
+
+        shape.points.forEach(point => {
+          delete point.velocity;
+          delete point.randomSeeds;
+          delete point.hidden;
+          delete point.body;
+          delete point.x;
+          delete point.y;
+          delete point.position;
+          !point.anchored && delete point.anchored;
+        });
+      });
+
+      this.exportModalContent.value = JSON.stringify(exportContent, true, 2);
+      this.exportModalContent.focus();
+    } else {
+      this.toolbar.classList.remove('is-overlayed');
+    }
+
+    this.buttons['export'].element.classList.toggle('is-hidden');
+    this.buttons['export_close'].element.classList.toggle('is-hidden');
+  }
+
+  toggleModalImport()
+  {
+    this.modalOverlayImport = !this.modalOverlayImport;
+    this.importModal.classList.toggle('is-hidden');
+  }
+
+  toggleModalExport()
+  {
+    this.modalOverlayExport = !this.modalOverlayExport;
+    this.exportModal.classList.toggle('is-hidden');
+  }
 }
 
 const svgNamespace = 'http://www.w3.org/2000/svg';
