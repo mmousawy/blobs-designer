@@ -800,19 +800,24 @@ class BlobDesigner
     } else {
       this.toolbar.classList.remove('is-overlayed');
 
-      const importData = JSON.parse(this.importModalContent.value);
+      try {
+        const importData = JSON.parse(this.importModalContent.value);
 
-      importData.forEach(shape => {
-        this.currentShape = new Blob(shape.anchor);
+        importData.forEach(shape => {
+          this.currentShape = new Blob(shape.anchor);
 
-        shape.points.forEach(point => {
-          this.currentShape.createPoint(point.anchor, null, point.anchored || false);
+          this.shapes.push(this.currentShape);
+          this.currentShape.appendPath();
+
+          shape.points.forEach(point => {
+            this.currentShape.createPoint(point.anchor, null, point.anchored || false);
+          });
+
+          this.currentShape.drawPath();
         });
-
-        this.shapes.push(this.currentShape);
-        this.currentShape.drawPath();
-        this.currentShape.appendPath();
-      });
+      } catch (error) {
+        console.log(error);
+      }
 
       this.resizeHandler();
     }
